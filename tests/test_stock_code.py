@@ -11,7 +11,7 @@ import pytest
 import requests
 from lxml import etree
 
-from tw_stock_agent.tools.stock_code import (
+from tw_stock_mcp.tools.stock_code import (
     ROW,
     TWSE_EQUITIES_URL,
     TPEX_EQUITIES_URL,
@@ -93,7 +93,7 @@ def test_to_csv(tmp_path):
     ]
     
     # Mock fetch_data to return our test data
-    with patch('tw_stock_agent.tools.stock_code.fetch_data', return_value=mock_data):
+    with patch('tw_stock_mcp.tools.stock_code.fetch_data', return_value=mock_data):
         to_csv(TWSE_EQUITIES_URL, str(test_file))
     
     # Verify the file was created and contains the expected data
@@ -154,7 +154,7 @@ def test_to_csv_directory_creation_error():
         ROW("股票", "2330", "台積電", "TW0002330000", "1994/09/05", "上市", "半導體業", "ESVUFR")
     ]
     
-    with patch('tw_stock_agent.tools.stock_code.fetch_data', return_value=mock_data), \
+    with patch('tw_stock_mcp.tools.stock_code.fetch_data', return_value=mock_data), \
          patch('os.makedirs', side_effect=PermissionError("Permission denied")):
         
         with pytest.raises(OSError) as exc_info:
@@ -171,7 +171,7 @@ def test_to_csv_file_write_error(tmp_path):
         ROW("股票", "2330", "台積電", "TW0002330000", "1994/09/05", "上市", "半導體業", "ESVUFR")
     ]
     
-    with patch('tw_stock_agent.tools.stock_code.fetch_data', return_value=mock_data), \
+    with patch('tw_stock_mcp.tools.stock_code.fetch_data', return_value=mock_data), \
          patch('builtins.open', side_effect=PermissionError("Permission denied")):
         
         with pytest.raises(OSError) as exc_info:
@@ -261,7 +261,7 @@ def test_update_stock_codes_success():
         ROW("股票", "2330", "台積電", "TW0002330000", "1994/09/05", "上市", "半導體業", "ESVUFR")
     ]
     
-    with patch('tw_stock_agent.tools.stock_code.to_csv') as mock_to_csv:
+    with patch('tw_stock_mcp.tools.stock_code.to_csv') as mock_to_csv:
         twse_path, tpex_path = update_stock_codes()
         
         assert twse_path.endswith("twse_equities.csv")
@@ -276,7 +276,7 @@ def test_update_stock_codes_success():
 
 def test_update_stock_codes_twse_failure():
     """Test update_stock_codes when TWSE update fails."""
-    with patch('tw_stock_agent.tools.stock_code.to_csv') as mock_to_csv:
+    with patch('tw_stock_mcp.tools.stock_code.to_csv') as mock_to_csv:
         mock_to_csv.side_effect = [Exception("TWSE fetch failed"), None]
         
         with pytest.raises(Exception) as exc_info:
@@ -287,7 +287,7 @@ def test_update_stock_codes_twse_failure():
 
 def test_update_stock_codes_tpex_failure():
     """Test update_stock_codes when TPEx update fails."""
-    with patch('tw_stock_agent.tools.stock_code.to_csv') as mock_to_csv:
+    with patch('tw_stock_mcp.tools.stock_code.to_csv') as mock_to_csv:
         mock_to_csv.side_effect = [None, Exception("TPEx fetch failed")]
         
         with pytest.raises(Exception) as exc_info:
@@ -360,7 +360,7 @@ def test_to_csv_header_format(tmp_path):
         ROW("股票", "2330", "台積電", "TW0002330000", "1994/09/05", "上市", "半導體業", "ESVUFR")
     ]
     
-    with patch('tw_stock_agent.tools.stock_code.fetch_data', return_value=mock_data):
+    with patch('tw_stock_mcp.tools.stock_code.fetch_data', return_value=mock_data):
         to_csv(TWSE_EQUITIES_URL, str(test_file))
     
     with open(test_file, encoding='utf-8') as f:
@@ -378,7 +378,7 @@ def test_to_csv_encoding_handling(tmp_path):
         ROW("股票", "2330", "台灣積體製造股份有限公司", "TW0002330000", "1994/09/05", "上市", "半導體業", "ESVUFR")
     ]
     
-    with patch('tw_stock_agent.tools.stock_code.fetch_data', return_value=mock_data):
+    with patch('tw_stock_mcp.tools.stock_code.fetch_data', return_value=mock_data):
         to_csv(TWSE_EQUITIES_URL, str(test_file))
     
     with open(test_file, encoding='utf-8') as f:
@@ -395,7 +395,7 @@ def test_to_csv_quoting_behavior(tmp_path):
         ROW("股票", "2330", '台積電,有限公司', "TW0002330000", "1994/09/05", "上市", "半導體業", "ESVUFR")
     ]
     
-    with patch('tw_stock_agent.tools.stock_code.fetch_data', return_value=mock_data):
+    with patch('tw_stock_mcp.tools.stock_code.fetch_data', return_value=mock_data):
         to_csv(TWSE_EQUITIES_URL, str(test_file))
     
     with open(test_file, encoding='utf-8') as f:

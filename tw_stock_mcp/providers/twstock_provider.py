@@ -13,12 +13,12 @@ from typing import Any
 import twstock
 from twstock import BestFourPoint, Stock
 
-from tw_stock_agent.exceptions import (
+from tw_stock_mcp.exceptions import (
     StockDataUnavailableError,
     StockMarketClosedError,
     StockNotFoundError,
 )
-from tw_stock_agent.utils.error_handler import CircuitBreaker
+from tw_stock_mcp.utils.error_handler import CircuitBreaker
 
 from .models import (
     BestFourPointsRecord,

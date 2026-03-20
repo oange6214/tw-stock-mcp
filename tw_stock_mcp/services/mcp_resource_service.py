@@ -12,13 +12,13 @@ from typing import Any, Dict, List, Optional, Set
 from urllib.parse import urlparse
 
 from cachetools import TTLCache
-from tw_stock_agent.exceptions import (
+from tw_stock_mcp.exceptions import (
     TwStockAgentError,
     MCPResourceError,
     create_error_response
 )
-from tw_stock_agent.utils.mcp_error_handler import MCPErrorHandler
-from tw_stock_agent.services.service_container import market_service, stock_service
+from tw_stock_mcp.utils.mcp_error_handler import MCPErrorHandler
+from tw_stock_mcp.services.service_container import market_service, stock_service
 
 logger = logging.getLogger("tw-stock-agent.mcp_resource_service")
 

@@ -2,16 +2,16 @@ import os
 from datetime import datetime
 from typing import Any
 
-from tw_stock_agent.services.service_container import market_service, stock_service
-from tw_stock_agent.utils.validation import (
+from tw_stock_mcp.services.service_container import market_service, stock_service
+from tw_stock_mcp.utils.validation import (
     StockCodeValidator,
     validate_stock_request
 )
-from tw_stock_agent.utils.mcp_error_handler import (
+from tw_stock_mcp.utils.mcp_error_handler import (
     mcp_error_handler,
     MCPResponseFormatter
 )
-from tw_stock_agent.exceptions import (
+from tw_stock_mcp.exceptions import (
     ParameterValidationError,
     TwStockAgentError
 )
@@ -235,7 +235,7 @@ async def get_deviation_scan(stock_codes: str = "") -> dict[str, Any]:
         - 需要至少 51 筆收盤價（20 MA + 30 評估日 + 1 今日）
         - 並發上限 3，每股間隔 0.35s，符合 TWSE 速率限制
     """
-    from tw_stock_agent.services.deviation_service import (
+    from tw_stock_mcp.services.deviation_service import (
         run_deviation_scan,
         fetch_twse_stock_list,
     )
@@ -271,7 +271,7 @@ async def get_market_overview() -> dict[str, Any]:
         # Re-raise our custom errors
         raise
     except Exception as e:
-        from tw_stock_agent.exceptions import StockDataUnavailableError
+        from tw_stock_mcp.exceptions import StockDataUnavailableError
         raise StockDataUnavailableError(
             stock_code="market",
             data_type="market overview",

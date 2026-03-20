@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from tw_stock_agent.exceptions import (
+from tw_stock_mcp.exceptions import (
     CacheError,
     ErrorCode,
     ErrorSeverity,
@@ -13,13 +13,13 @@ from tw_stock_agent.exceptions import (
     StockNotFoundError,
     TwStockAgentError,
 )
-from tw_stock_agent.providers.base import StockDataProvider
-from tw_stock_agent.providers.factory import create_provider
-from tw_stock_agent.services.cache_service import CacheConfig, CacheService
-from tw_stock_agent.utils.connection_pool import HTTPConnectionPool, get_global_pool
-from tw_stock_agent.utils.error_handler import with_async_error_handling, with_retry
-from tw_stock_agent.utils.performance_monitor import get_global_monitor
-from tw_stock_agent.utils.validation import StockCodeValidator
+from tw_stock_mcp.providers.base import StockDataProvider
+from tw_stock_mcp.providers.factory import create_provider
+from tw_stock_mcp.services.cache_service import CacheConfig, CacheService
+from tw_stock_mcp.utils.connection_pool import HTTPConnectionPool, get_global_pool
+from tw_stock_mcp.utils.error_handler import with_async_error_handling, with_retry
+from tw_stock_mcp.utils.performance_monitor import get_global_monitor
+from tw_stock_mcp.utils.validation import StockCodeValidator
 
 logger = logging.getLogger("tw-stock-agent.stock_service")
 
@@ -149,7 +149,7 @@ class StockService:
         validated_code = StockCodeValidator.validate_stock_code(stock_code)
 
         if days <= 0 or days > 3650:
-            from tw_stock_agent.exceptions import RangeValidationError
+            from tw_stock_mcp.exceptions import RangeValidationError
 
             raise RangeValidationError(
                 field_name="days", value=days, min_value=1, max_value=3650
@@ -282,7 +282,7 @@ class StockService:
     ) -> Dict[str, Dict[str, Any]]:
         """批量獲取多支股票的基本資料。"""
         if not stock_codes:
-            from tw_stock_agent.exceptions import ParameterValidationError
+            from tw_stock_mcp.exceptions import ParameterValidationError
 
             raise ParameterValidationError(
                 parameter_name="stock_codes",
@@ -335,7 +335,7 @@ class StockService:
     ) -> Dict[str, Dict[str, Any]]:
         """批量獲取多支股票的即時資料。"""
         if not stock_codes:
-            from tw_stock_agent.exceptions import ParameterValidationError
+            from tw_stock_mcp.exceptions import ParameterValidationError
 
             raise ParameterValidationError(
                 parameter_name="stock_codes",

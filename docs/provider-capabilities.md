@@ -1,6 +1,6 @@
 # Provider Capabilities
 
-這份文件說明 `tw-stock-agent` 目前各 provider 的能力差異。
+這份文件說明 `tw-stock-mcp` 目前各 provider 的能力差異。
 
 ## Capability Matrix
 

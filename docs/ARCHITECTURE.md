@@ -1,6 +1,6 @@
-# tw-stock-agent Architecture
+# tw-stock-mcp Architecture
 
-`tw-stock-agent` 是台股資料 MCP 服務層，負責把外部資料來源整理成穩定的 MCP tools 與 resources。
+`tw-stock-mcp` 是台股資料 MCP 服務層，負責把外部資料來源整理成穩定的 MCP tools 與 resources。
 
 ## 分層
 

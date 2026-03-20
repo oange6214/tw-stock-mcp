@@ -8,13 +8,13 @@ and request validation functions.
 import pytest
 from datetime import datetime
 
-from tw_stock_agent.utils.validation import (
+from tw_stock_mcp.utils.validation import (
     StockCodeValidator,
     ParameterValidator,
     StockParameterValidator,
     validate_stock_request,
 )
-from tw_stock_agent.exceptions import (
+from tw_stock_mcp.exceptions import (
     InvalidStockCodeError,
     StockCodeValidationError,
     ParameterValidationError,

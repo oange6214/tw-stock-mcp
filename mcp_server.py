@@ -7,14 +7,14 @@ from typing import Any, Dict, Optional
 
 from mcp.server.fastmcp import FastMCP
 
-from tw_stock_agent.models import (
+from tw_stock_mcp.models import (
     BestFourPointsResponse,
     MarketOverviewResponse,
     PriceHistoryResponse,
     RealtimeDataResponse,
     StockDataResponse,
 )
-from tw_stock_agent.tools.stock_tools import (
+from tw_stock_mcp.tools.stock_tools import (
     get_best_four_points,
     get_deviation_scan,
     get_market_overview,
@@ -22,16 +22,16 @@ from tw_stock_agent.tools.stock_tools import (
     get_realtime_data,
     get_stock_data,
 )
-from tw_stock_agent.utils.config import get_settings
-from tw_stock_agent.utils.mcp_error_handler import (
+from tw_stock_mcp.utils.config import get_settings
+from tw_stock_mcp.utils.mcp_error_handler import (
     MCPErrorHandler,
     MCPResponseFormatter
 )
-from tw_stock_agent.exceptions import (
+from tw_stock_mcp.exceptions import (
     TwStockAgentError,
     create_error_response
 )
-from tw_stock_agent.services.mcp_resource_service import resource_manager
+from tw_stock_mcp.services.mcp_resource_service import resource_manager
 
 # Get settings from config
 settings = get_settings()
@@ -83,7 +83,7 @@ async def get_stock_data_tool(stock_code: str) -> StockDataResponse:
     try:
         raw_data = await get_stock_data(stock_code)
         # Extract clean data without _metadata for Pydantic model
-        from tw_stock_agent.utils.mcp_error_handler import MCPResponseFormatter
+        from tw_stock_mcp.utils.mcp_error_handler import MCPResponseFormatter
         clean_data = MCPResponseFormatter.extract_metadata_for_model(raw_data)
         return StockDataResponse(**clean_data)
     except TwStockAgentError as e:
@@ -112,7 +112,7 @@ async def get_price_history_tool(
     try:
         raw_data = await get_price_history(stock_code, period)
         # Extract clean data without _metadata for Pydantic model
-        from tw_stock_agent.utils.mcp_error_handler import MCPResponseFormatter
+        from tw_stock_mcp.utils.mcp_error_handler import MCPResponseFormatter
         clean_data = MCPResponseFormatter.extract_metadata_for_model(raw_data)
         return PriceHistoryResponse(**clean_data)
     except TwStockAgentError as e:
@@ -139,7 +139,7 @@ async def get_best_four_points_tool(stock_code: str) -> BestFourPointsResponse:
     try:
         raw_data = await get_best_four_points(stock_code)
         # Extract clean data without _metadata for Pydantic model
-        from tw_stock_agent.utils.mcp_error_handler import MCPResponseFormatter
+        from tw_stock_mcp.utils.mcp_error_handler import MCPResponseFormatter
         clean_data = MCPResponseFormatter.extract_metadata_for_model(raw_data)
         return BestFourPointsResponse(**clean_data)
     except TwStockAgentError as e:
@@ -163,7 +163,7 @@ async def get_realtime_data_tool(stock_code: str) -> RealtimeDataResponse:
     try:
         raw_data = await get_realtime_data(stock_code)
         # Extract clean data without _metadata for Pydantic model
-        from tw_stock_agent.utils.mcp_error_handler import MCPResponseFormatter
+        from tw_stock_mcp.utils.mcp_error_handler import MCPResponseFormatter
         clean_data = MCPResponseFormatter.extract_metadata_for_model(raw_data)
         return RealtimeDataResponse(**clean_data)
     except TwStockAgentError as e:
@@ -187,7 +187,7 @@ async def get_market_overview_tool() -> MarketOverviewResponse:
     try:
         raw_data = await get_market_overview()
         # Extract clean data without _metadata for Pydantic model
-        from tw_stock_agent.utils.mcp_error_handler import MCPResponseFormatter
+        from tw_stock_mcp.utils.mcp_error_handler import MCPResponseFormatter
         clean_data = MCPResponseFormatter.extract_metadata_for_model(raw_data)
         return MarketOverviewResponse(**clean_data)
     except TwStockAgentError as e:

@@ -3,7 +3,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [project]
-name = "tw-stock-agent"
+name = "tw-stock-mcp"
 version = "0.1.0"
 description = "台灣股市資料 MCP 服務器"
 readme = "README.md"
@@ -43,10 +43,10 @@ monitoring = [
 ]
 
 [project.scripts]
-tw-stock-agent = "mcp_server:mcp"
+tw-stock-mcp = "mcp_server:mcp"
 
 [tool.hatch.build.targets.wheel]
-packages = ["tw_stock_agent"]
+packages = ["tw_stock_mcp"]
 
 [tool.ruff]
 line-length = 88
@@ -55,7 +55,7 @@ select = ["E", "F", "B", "I", "N", "UP", "PL", "RUF"]
 ignore = []
 
 [tool.ruff.isort]
-known-first-party = ["tw_stock_agent"]
+known-first-party = ["tw_stock_mcp"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -75,7 +75,7 @@ warn_unreachable = true
 asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --cov=tw_stock_agent --cov-report=term-missing"
+addopts = "-v --cov=tw_stock_mcp --cov-report=term-missing"
 
 [dependency-groups]
 dev = [

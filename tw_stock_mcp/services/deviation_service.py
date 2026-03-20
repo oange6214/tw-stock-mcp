@@ -28,7 +28,7 @@ _STOCK_LIST_CACHE_MAX_AGE = 7 * 24 * 3600  # 7 days
 
 
 def _cache_db_path() -> str:
-    cache_dir = os.path.join(os.path.expanduser("~"), ".tw_stock_agent", "cache")
+    cache_dir = os.path.join(os.path.expanduser("~"), ".tw_stock_mcp", "cache")
     os.makedirs(cache_dir, exist_ok=True)
     return os.path.join(cache_dir, "cache.db")
 

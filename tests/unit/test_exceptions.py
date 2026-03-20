@@ -9,7 +9,7 @@ import pytest
 from datetime import datetime
 from typing import Any, Dict
 
-from tw_stock_agent.exceptions import (
+from tw_stock_mcp.exceptions import (
     # Base exceptions
     TwStockAgentError,
     ErrorCode,
@@ -341,7 +341,7 @@ class TestCacheExceptions:
 class TestErrorResponseCreation:
     """Test error response creation utilities."""
     
-    def test_create_error_response_with_tw_stock_agent_error(self):
+    def test_create_error_response_with_tw_stock_mcp_error(self):
         """Test creating error response from TwStockAgentError."""
         error = StockNotFoundError("2330")
         response = create_error_response(error)

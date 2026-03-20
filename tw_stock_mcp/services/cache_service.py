@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from queue import Queue
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
-from tw_stock_agent.utils.database_pool import DatabasePool, DatabasePoolConfig
+from tw_stock_mcp.utils.database_pool import DatabasePool, DatabasePoolConfig
 
 logger = logging.getLogger("tw-stock-agent.cache_service")
 
@@ -71,7 +71,7 @@ class CacheService:
         self._stats_lock = threading.RLock()
         
         # 確保快取目錄存在
-        self.cache_dir = os.path.join(os.path.expanduser("~"), ".tw_stock_agent", "cache")
+        self.cache_dir = os.path.join(os.path.expanduser("~"), ".tw_stock_mcp", "cache")
         os.makedirs(self.cache_dir, exist_ok=True)
         
         # 初始化SQLite資料庫

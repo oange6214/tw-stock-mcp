@@ -1,4 +1,4 @@
-# tw-stock-agent
+# tw-stock-mcp
 
 台灣股市資料 MCP 服務器。這個專案是整個 workspace 的資料能力層，負責對外提供 MCP tools、resources 與結構化回應。
 
@@ -6,7 +6,7 @@
 
 在這個 workspace 中：
 
-- `tw-stock-agent`：資料服務層
+- `tw-stock-mcp`：資料服務層
 - `tw-stock-plugin`：工作流與插件層
 - `tw-stock`：報告輸出工作區
 
@@ -114,10 +114,10 @@ uv run python mcp_server.py
 ```json
 {
   "mcpServers": {
-    "tw-stock-agent": {
+    "tw-stock-mcp": {
       "command": "uv",
       "args": ["run", "python", "mcp_server.py"],
-      "cwd": "/path/to/tw-stock-agent"
+      "cwd": "/path/to/tw-stock-mcp"
     }
   }
 }

@@ -20,7 +20,7 @@ from typing import Any, Optional
 
 import aiohttp
 
-from tw_stock_agent.exceptions import (
+from tw_stock_mcp.exceptions import (
     ExternalAPIError,
     StockDataUnavailableError,
     StockNotFoundError,

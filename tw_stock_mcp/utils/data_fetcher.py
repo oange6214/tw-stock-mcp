@@ -8,8 +8,8 @@ import aiohttp
 import requests
 from bs4 import BeautifulSoup
 
-from tw_stock_agent.utils.connection_pool import HTTPConnectionPool, get_global_pool
-from tw_stock_agent.utils.performance_monitor import get_global_monitor
+from tw_stock_mcp.utils.connection_pool import HTTPConnectionPool, get_global_pool
+from tw_stock_mcp.utils.performance_monitor import get_global_monitor
 
 logger = logging.getLogger("tw-stock-agent.data_fetcher")
 

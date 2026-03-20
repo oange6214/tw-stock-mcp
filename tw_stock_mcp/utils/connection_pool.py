@@ -10,7 +10,7 @@ from typing import Any, AsyncIterator, Dict, Optional
 import aiohttp
 from aiohttp import ClientTimeout, TCPConnector, ClientSession
 
-from tw_stock_agent.utils.config import ConnectionPoolConfig, get_connection_pool_config
+from tw_stock_mcp.utils.config import ConnectionPoolConfig, get_connection_pool_config
 
 logger = logging.getLogger("tw-stock-agent.connection_pool")
 

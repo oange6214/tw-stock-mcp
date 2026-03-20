@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Callable
 
-from tw_stock_agent.utils.config import get_settings
-from tw_stock_agent.utils.connection_pool import ConnectionMetrics
-from tw_stock_agent.utils.database_pool import DatabaseMetrics
+from tw_stock_mcp.utils.config import get_settings
+from tw_stock_mcp.utils.connection_pool import ConnectionMetrics
+from tw_stock_mcp.utils.database_pool import DatabaseMetrics
 
 logger = logging.getLogger("tw-stock-agent.performance_monitor")
 
@@ -144,7 +144,7 @@ class PerformanceMonitor:
         self._max_history = 1440  # 24 hours of minute-by-minute data
         
         # Export configuration
-        self.export_path = Path(export_path) if export_path else Path.home() / ".tw_stock_agent" / "metrics"
+        self.export_path = Path(export_path) if export_path else Path.home() / ".tw_stock_mcp" / "metrics"
         self.export_path.mkdir(parents=True, exist_ok=True)
         
         # Monitoring state

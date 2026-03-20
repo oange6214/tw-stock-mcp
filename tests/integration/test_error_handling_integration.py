@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import Mock, patch, AsyncMock
 import asyncio
 
-from tw_stock_agent.exceptions import (
+from tw_stock_mcp.exceptions import (
     StockNotFoundError,
     InvalidStockCodeError,
     StockCodeValidationError,
@@ -17,11 +17,11 @@ from tw_stock_agent.exceptions import (
     RateLimitError,
     TwStockAgentError,
 )
-from tw_stock_agent.utils.validation import StockCodeValidator
-from tw_stock_agent.utils.error_handler import ErrorEnricher, CircuitBreaker
-from tw_stock_agent.utils.mcp_error_handler import MCPErrorHandler
-from tw_stock_agent.services.stock_service import StockService
-from tw_stock_agent.tools.stock_tools import get_stock_data
+from tw_stock_mcp.utils.validation import StockCodeValidator
+from tw_stock_mcp.utils.error_handler import ErrorEnricher, CircuitBreaker
+from tw_stock_mcp.utils.mcp_error_handler import MCPErrorHandler
+from tw_stock_mcp.services.stock_service import StockService
+from tw_stock_mcp.tools.stock_tools import get_stock_data
 
 
 class TestErrorHandlingIntegration:
@@ -88,7 +88,7 @@ class TestErrorHandlingIntegration:
     async def test_mcp_tool_error_handling_integration(self):
         """Test complete MCP tool error handling flow."""
         # Mock StockService to raise an exception
-        with patch('tw_stock_agent.tools.stock_tools.stock_service') as mock_service:
+        with patch('tw_stock_mcp.tools.stock_tools.stock_service') as mock_service:
             mock_service.fetch_stock_data = AsyncMock()
             mock_service.fetch_stock_data.side_effect = StockNotFoundError("2330")
             
@@ -377,7 +377,7 @@ class TestRealWorldScenarios:
     
     async def test_market_closure_scenario(self):
         """Test handling of market closure scenarios."""
-        from tw_stock_agent.exceptions import StockMarketClosedError
+        from tw_stock_mcp.exceptions import StockMarketClosedError
         
         # Simulate market closed error
         error = StockMarketClosedError("2330")
@@ -397,7 +397,7 @@ class TestRealWorldScenarios:
     
     async def test_data_source_failure_scenario(self):
         """Test handling of external data source failures."""
-        from tw_stock_agent.exceptions import DataSourceUnavailableError
+        from tw_stock_mcp.exceptions import DataSourceUnavailableError
         
         # Simulate data source failure
         error = DataSourceUnavailableError(

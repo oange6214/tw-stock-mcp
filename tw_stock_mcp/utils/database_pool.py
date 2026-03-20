@@ -10,7 +10,7 @@ from pathlib import Path
 from queue import Queue, Empty, Full
 from typing import AsyncIterator, Iterator, Optional, Dict, Any, List
 
-from tw_stock_agent.utils.config import DatabasePoolConfig, get_database_pool_config
+from tw_stock_mcp.utils.config import DatabasePoolConfig, get_database_pool_config
 
 logger = logging.getLogger("tw-stock-agent.database_pool")
 

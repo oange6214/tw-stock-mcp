@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, patch
 import json
 from datetime import datetime
 
-from tw_stock_agent.services.mcp_resource_service import ResourceManager
-from tw_stock_agent.exceptions import MCPResourceError
+from tw_stock_mcp.services.mcp_resource_service import ResourceManager
+from tw_stock_mcp.exceptions import MCPResourceError
 
 
 class TestResourceManager:
@@ -103,7 +103,7 @@ class TestResourceManager:
     @pytest.mark.asyncio
     async def test_get_stock_info_resource(self):
         """Test getting stock info resource."""
-        with patch('tw_stock_agent.services.mcp_resource_service.get_stock_data') as mock_get:
+        with patch('tw_stock_mcp.services.mcp_resource_service.get_stock_data') as mock_get:
             mock_get.return_value = {
                 "stock_code": "2330",
                 "name": "台積電",
@@ -122,7 +122,7 @@ class TestResourceManager:
     @pytest.mark.asyncio
     async def test_get_price_resource_with_period(self):
         """Test getting price resource with period."""
-        with patch('tw_stock_agent.services.mcp_resource_service.get_price_history') as mock_get:
+        with patch('tw_stock_mcp.services.mcp_resource_service.get_price_history') as mock_get:
             mock_get.return_value = {
                 "stock_code": "2330",
                 "period": "1y",
@@ -140,7 +140,7 @@ class TestResourceManager:
     @pytest.mark.asyncio
     async def test_get_market_overview_resource(self):
         """Test getting market overview resource."""
-        with patch('tw_stock_agent.services.mcp_resource_service.get_market_overview') as mock_get:
+        with patch('tw_stock_mcp.services.mcp_resource_service.get_market_overview') as mock_get:
             mock_get.return_value = {
                 "trading_date": "2024-01-01",
                 "taiex_index": {"current_value": 17000.0}
@@ -174,7 +174,7 @@ class TestResourceManager:
     @pytest.mark.asyncio
     async def test_resource_caching(self):
         """Test that resources are properly cached."""
-        with patch('tw_stock_agent.services.mcp_resource_service.get_stock_data') as mock_get:
+        with patch('tw_stock_mcp.services.mcp_resource_service.get_stock_data') as mock_get:
             mock_get.return_value = {"stock_code": "2330", "name": "台積電"}
             
             # First call should hit the service
@@ -191,8 +191,8 @@ class TestResourceManager:
     @pytest.mark.asyncio 
     async def test_error_handling_in_resource_fetch(self):
         """Test error handling when resource fetch fails."""
-        with patch('tw_stock_agent.services.mcp_resource_service.get_stock_data') as mock_get:
-            from tw_stock_agent.exceptions import StockNotFoundError
+        with patch('tw_stock_mcp.services.mcp_resource_service.get_stock_data') as mock_get:
+            from tw_stock_mcp.exceptions import StockNotFoundError
             mock_get.side_effect = StockNotFoundError("2330")
             
             result = await self.resource_manager.get_resource("stock://info/2330")

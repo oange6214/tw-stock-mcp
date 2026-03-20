@@ -4,9 +4,9 @@ import logging
 from datetime import datetime
 from typing import Any, Optional
 
-from tw_stock_agent.exceptions import ExternalAPIError, StockDataUnavailableError
-from tw_stock_agent.services.stock_service import StockService
-from tw_stock_agent.utils.connection_pool import HTTPConnectionPool, get_global_pool
+from tw_stock_mcp.exceptions import ExternalAPIError, StockDataUnavailableError
+from tw_stock_mcp.services.stock_service import StockService
+from tw_stock_mcp.utils.connection_pool import HTTPConnectionPool, get_global_pool
 
 logger = logging.getLogger("tw-stock-agent.market_service")
 

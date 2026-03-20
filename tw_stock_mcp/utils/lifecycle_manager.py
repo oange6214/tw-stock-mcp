@@ -7,9 +7,9 @@ import sys
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
-from tw_stock_agent.utils.connection_pool import HTTPConnectionPool, close_global_pool
-from tw_stock_agent.utils.database_pool import AsyncDatabasePool
-from tw_stock_agent.utils.performance_monitor import PerformanceMonitor, stop_global_monitoring
+from tw_stock_mcp.utils.connection_pool import HTTPConnectionPool, close_global_pool
+from tw_stock_mcp.utils.database_pool import AsyncDatabasePool
+from tw_stock_mcp.utils.performance_monitor import PerformanceMonitor, stop_global_monitoring
 
 logger = logging.getLogger("tw-stock-agent.lifecycle_manager")
 
@@ -209,7 +209,7 @@ class ConnectionPoolManager:
         logger.info(f"Database connection pool initialized for {db_path}")
         
         # Initialize performance monitoring
-        from tw_stock_agent.utils.performance_monitor import get_global_monitor
+        from tw_stock_mcp.utils.performance_monitor import get_global_monitor
         self.performance_monitor = get_global_monitor()
         
         # Register pools with performance monitor

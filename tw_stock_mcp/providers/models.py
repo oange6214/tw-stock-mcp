@@ -2,7 +2,7 @@
 
 These dataclasses standardise the internal contract between a provider and
 StockService.  They are NOT the Pydantic response models consumed by MCP
-tools — those live in tw_stock_agent.models.stock_models.  Converting a
+tools — those live in tw_stock_mcp.models.stock_models.  Converting a
 record to a plain dict via .to_dict() yields exactly the shape that
 StockService currently passes to MCPResponseFormatter.
 """

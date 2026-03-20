@@ -14,7 +14,7 @@ Resolution order for the FinMind token:
 import logging
 from typing import Literal, Optional
 
-from tw_stock_agent.providers.base import StockDataProvider
+from tw_stock_mcp.providers.base import StockDataProvider
 
 logger = logging.getLogger("tw-stock-agent.providers.factory")
 
@@ -40,7 +40,7 @@ def create_provider(
         ValueError: Unknown provider name.
     """
     # Lazy import to avoid loading settings / provider deps at module load time
-    from tw_stock_agent.utils.config import get_settings
+    from tw_stock_mcp.utils.config import get_settings
 
     settings = get_settings()
     provider_name: str = name or settings.STOCK_DATA_PROVIDER
@@ -48,12 +48,12 @@ def create_provider(
     logger.info("Creating stock data provider: %s", provider_name)
 
     if provider_name == "twstock":
-        from tw_stock_agent.providers.twstock_provider import TwstockProvider
+        from tw_stock_mcp.providers.twstock_provider import TwstockProvider
 
         return TwstockProvider()
 
     if provider_name == "finmind":
-        from tw_stock_agent.providers.finmind_provider import FinMindProvider
+        from tw_stock_mcp.providers.finmind_provider import FinMindProvider
 
         token = finmind_token or settings.FINMIND_API_TOKEN
         if not token:

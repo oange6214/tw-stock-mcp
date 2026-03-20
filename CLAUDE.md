@@ -1,4 +1,4 @@
-# tw-stock-agent
+# tw-stock-mcp
 
 台灣股市資料 MCP 伺服器。負責對外提供 MCP tools、resources 與結構化回應。
 

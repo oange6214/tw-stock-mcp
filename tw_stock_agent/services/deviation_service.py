@@ -1,7 +1,10 @@
 """Bulk deviation scan service — fetches TWSE STOCK_DAY data and calculates 60MA deviation."""
 
 import asyncio
+import json
 import logging
+import os
+import sqlite3
 import ssl
 import time
 from datetime import date
@@ -18,6 +21,60 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Accept": "application/json",
 }
+
+# --- Stock list cache ---
+_STOCK_LIST_CACHE_KEY = "twse:stock_list"
+_STOCK_LIST_CACHE_MAX_AGE = 7 * 24 * 3600  # 7 days
+
+
+def _cache_db_path() -> str:
+    cache_dir = os.path.join(os.path.expanduser("~"), ".tw_stock_agent", "cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    return os.path.join(cache_dir, "cache.db")
+
+
+def _load_stock_list_from_cache() -> list[tuple[str, str]] | None:
+    """Return cached (code, name) list if recorded within the last 7 days, else None."""
+    try:
+        db_path = _cache_db_path()
+        if not os.path.exists(db_path):
+            return None
+        cutoff = int(time.time()) - _STOCK_LIST_CACHE_MAX_AGE
+        with sqlite3.connect(db_path, timeout=10) as conn:
+            row = conn.execute(
+                "SELECT value FROM cache WHERE key = ? AND created_at >= ?",
+                (_STOCK_LIST_CACHE_KEY, cutoff),
+            ).fetchone()
+        if row:
+            stocks = [(item["code"], item["name"]) for item in json.loads(row[0])]
+            logger.info("Stock list loaded from cache: %d stocks", len(stocks))
+            return stocks
+    except Exception as exc:
+        logger.warning("Failed to load stock list from cache: %s", exc)
+    return None
+
+
+def _save_stock_list_to_cache(stocks: list[tuple[str, str]]) -> None:
+    """Persist (code, name) list to the shared SQLite cache."""
+    try:
+        db_path = _cache_db_path()
+        now = int(time.time())
+        value = json.dumps([{"code": c, "name": n} for c, n in stocks], ensure_ascii=False)
+        expire_at = now + _STOCK_LIST_CACHE_MAX_AGE
+        with sqlite3.connect(db_path, timeout=10) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO cache
+                    (key, value, expire_at, created_at, last_accessed, data_type, size_bytes)
+                VALUES (?, ?, ?, ?, ?, 'json', ?)
+                """,
+                (_STOCK_LIST_CACHE_KEY, value, expire_at, now, now, len(value.encode())),
+            )
+            conn.commit()
+        logger.info("Stock list saved to cache: %d stocks", len(stocks))
+    except Exception as exc:
+        logger.warning("Failed to save stock list to cache: %s", exc)
+
 
 # Minimum closes needed: 60 (MA window) + 30 (eval window) + 1 (today)
 _MIN_CLOSES = 91
@@ -205,9 +262,17 @@ async def fetch_twse_stock_list(min_trade_value: int = 100_000_000) -> list[tupl
     Filters:
     - 4-digit numeric codes only (excludes ETFs starting with '00', DR, warrants)
     - TradeValue (成交金額) > *min_trade_value* (default 1 億)
+
+    Resilience:
+    - On success: saves result to SQLite cache (TTL 7 days).
+    - On failure or empty response (e.g. non-trading day): falls back to the
+      most recent cached list (up to 7 days old) before raising.
     """
     ssl_ctx = _build_ssl_context()
     connector = aiohttp.TCPConnector()
+    fetch_error: Exception | None = None
+    rows: list = []
+
     async with aiohttp.ClientSession(connector=connector) as session:
         try:
             async with session.get(
@@ -217,10 +282,11 @@ async def fetch_twse_stock_list(min_trade_value: int = 100_000_000) -> list[tupl
                 ssl=ssl_ctx,
             ) as resp:
                 if resp.status != 200:
-                    raise RuntimeError(f"STOCK_DAY_ALL returned HTTP {resp.status}")
-                rows = await resp.json(content_type=None)
+                    fetch_error = RuntimeError(f"STOCK_DAY_ALL returned HTTP {resp.status}")
+                else:
+                    rows = await resp.json(content_type=None)
         except Exception as exc:
-            raise RuntimeError(f"Failed to fetch TWSE stock list: {exc}") from exc
+            fetch_error = exc
 
     stocks: list[tuple[str, str]] = []
     for row in rows:
@@ -236,5 +302,21 @@ async def fetch_twse_stock_list(min_trade_value: int = 100_000_000) -> list[tupl
         if trade_value > min_trade_value:
             stocks.append((code, name))
 
-    logger.info("Fetched TWSE stock list: %d stocks after filtering", len(stocks))
-    return stocks
+    if stocks:
+        logger.info("Fetched TWSE stock list: %d stocks after filtering", len(stocks))
+        _save_stock_list_to_cache(stocks)
+        return stocks
+
+    # Empty result — non-trading day or API error; try cache fallback
+    reason = str(fetch_error) if fetch_error else "STOCK_DAY_ALL returned empty list (non-trading day?)"
+    logger.warning("Live stock list unavailable (%s); trying cache fallback", reason)
+
+    cached = _load_stock_list_from_cache()
+    if cached:
+        logger.info("Using cached stock list: %d stocks (up to 7 days old)", len(cached))
+        return cached
+
+    # No cache available either
+    raise RuntimeError(
+        f"Failed to fetch TWSE stock list and no cache available. Reason: {reason}"
+    )

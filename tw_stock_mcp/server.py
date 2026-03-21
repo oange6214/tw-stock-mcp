@@ -141,14 +141,14 @@ async def get_fundamental_data_tool(stock_code: str) -> Dict[str, Any]:
 @mcp.tool(
     name="get_deviation_scan",
     description=(
-        "批量掃描所有台股的 20MA 負乖離翻正標的。"
-        "篩選條件：今日乖離率 0~5%（剛站上 MA20），且近 30 日有 ≥24 天為負乖離。"
+        "批量掃描所有台股的 60MA 負乖離翻正標的。"
+        "篩選條件：今日乖離率 0~5%（剛站上 MA60），且近 30 日有 ≥24 天為負乖離。"
         "傳入逗號分隔的 stock_codes 可只掃描指定股票；留空則自動從 TWSE 抓取當日清單。"
         "注意：全市場掃描約需 10–20 分鐘，建議盤後執行。"
     ),
 )
 async def get_deviation_scan_tool(stock_codes: str = "") -> Dict[str, Any]:
-    """Bulk TWSE deviation scan — returns matched stocks with 20MA deviation criteria."""
+    """Bulk TWSE deviation scan — returns matched stocks with 60MA deviation criteria."""
     try:
         return await get_deviation_scan(stock_codes)
     except TwStockAgentError as e:

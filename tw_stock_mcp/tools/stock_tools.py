@@ -219,7 +219,7 @@ async def get_realtime_data(stock_code: str) -> dict[str, Any]:
 @mcp_error_handler("get_deviation_scan")
 async def get_deviation_scan(stock_codes: str = "") -> dict[str, Any]:
     """
-    批量掃描台股負乖離翻正標的（20MA 基準）
+    批量掃描台股負乖離翻正標的（60MA 基準）
 
     Args:
         stock_codes: 逗號分隔的股票代號，例如 "2330,2454,2382"。

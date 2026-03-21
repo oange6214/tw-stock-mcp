@@ -246,7 +246,8 @@ async def get_deviation_scan(stock_codes: str = "") -> dict[str, Any]:
     else:
         stocks = await fetch_twse_stock_list()
 
-    result = await run_deviation_scan(stocks)
+    from tw_stock_mcp.services.deviation_service import _last_n_months
+    result = await run_deviation_scan(stocks, months=_last_n_months(6))
     return result
 
 

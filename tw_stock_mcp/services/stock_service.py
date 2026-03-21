@@ -265,8 +265,33 @@ class StockService:
         try:
             data = await self._provider.get_realtime_data(validated_code)
         except (StockNotFoundError, StockDataUnavailableError):
-            self._performance_monitor.record_error()
-            raise
+            # 非交易日（週末/假日）FinMind 回傳 STOCK_NOT_FOUND，
+            # 改從近期 price_history 取最後一筆作為備援
+            try:
+                logger.info("即時資料不可用，改用 price_history 備援：%s", validated_code)
+                price_data = await self.fetch_price_data(validated_code, days=5)
+                if price_data:
+                    last = price_data[-1]
+                    data = {
+                        "stock_code": validated_code,
+                        "close": last.get("close"),
+                        "open": last.get("open"),
+                        "high": last.get("high"),
+                        "low": last.get("low"),
+                        "volume": last.get("volume"),
+                        "date": last.get("date"),
+                        "source": "price_history_fallback",
+                    }
+                else:
+                    self._performance_monitor.record_error()
+                    raise StockDataUnavailableError(
+                        stock_code=validated_code,
+                        data_type="realtime data",
+                        message="即時資料與 price_history 備援均無資料",
+                    )
+            except (StockNotFoundError, StockDataUnavailableError):
+                self._performance_monitor.record_error()
+                raise
 
         tags = ["realtime", f"stock_{validated_code}", "live_data"]
         self._set_cached_data(cache_key, data, self.cache_ttl["realtime"], tags)

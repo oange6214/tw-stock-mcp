@@ -1203,7 +1203,7 @@ wheels = [
 ]
 
 [[package]]
-name = "tw-stock-agent"
+name = "tw-stock-mcp"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

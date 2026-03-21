@@ -43,7 +43,7 @@ monitoring = [
 ]
 
 [project.scripts]
-tw-stock-mcp = "mcp_server:mcp"
+tw-stock-mcp = "tw_stock_mcp.server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["tw_stock_mcp"]

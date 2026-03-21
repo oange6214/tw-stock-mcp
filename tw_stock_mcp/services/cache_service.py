@@ -77,6 +77,9 @@ class CacheService:
         # 初始化SQLite資料庫
         self.db_path = os.path.join(self.cache_dir, "cache.db")
         
+        # 無論使用哪種連線池，都先執行 schema 初始化與 migration
+        self._init_db()
+
         # Choose connection pool implementation
         self._optimized_pool: Optional[DatabasePool] = None
         if self.config.use_optimized_pool:
@@ -98,9 +101,6 @@ class CacheService:
             self._connection_pool: Queue[sqlite3.Connection] = Queue(maxsize=self.config.max_connections)
             self._pool_lock = threading.Lock()
             self._pool_initialized = False
-            
-            # 初始化資料庫和連線池
-            self._init_db()
             self._init_connection_pool()
         
         # 清理和維護

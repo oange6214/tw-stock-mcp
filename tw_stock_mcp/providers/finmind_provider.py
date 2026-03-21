@@ -158,6 +158,33 @@ class FinMindProvider:
         )
         return record.to_dict()
 
+    async def get_per_history(self, stock_code: str, years: int = 3) -> list[dict[str, Any]]:
+        """Fetch historical PE/PBR/dividend-yield data from TaiwanStockPER dataset."""
+        end_date = datetime.now().date()
+        start_date = end_date.replace(year=end_date.year - years)
+        params = {
+            "dataset": "TaiwanStockPER",
+            "data_id": stock_code,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+        }
+        raw = await self._request(params)
+        return raw.get("data", [])
+
+    async def get_eps_history(self, stock_code: str, years: int = 3) -> list[dict[str, Any]]:
+        """Fetch quarterly EPS from TaiwanStockFinancialStatements dataset."""
+        end_date = datetime.now().date()
+        start_date = end_date.replace(year=end_date.year - years)
+        params = {
+            "dataset": "TaiwanStockFinancialStatements",
+            "data_id": stock_code,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+        }
+        raw = await self._request(params)
+        rows = raw.get("data", [])
+        return [r for r in rows if r.get("type") == "EPS"]
+
     async def get_best_four_points(self, stock_code: str) -> dict[str, Any]:
         """Not supported by FinMind — raises StockDataUnavailableError."""
         raise StockDataUnavailableError(

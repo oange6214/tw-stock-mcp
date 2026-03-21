@@ -7,30 +7,17 @@ from typing import Any, Dict, Optional
 
 from mcp.server.fastmcp import FastMCP
 
-from tw_stock_mcp.models import (
-    BestFourPointsResponse,
-    MarketOverviewResponse,
-    PriceHistoryResponse,
-    RealtimeDataResponse,
-    StockDataResponse,
-)
 from tw_stock_mcp.tools.stock_tools import (
     get_best_four_points,
     get_deviation_scan,
+    get_fundamental_data,
     get_market_overview,
     get_price_history,
     get_realtime_data,
     get_stock_data,
 )
 from tw_stock_mcp.utils.config import get_settings
-from tw_stock_mcp.utils.mcp_error_handler import (
-    MCPErrorHandler,
-    MCPResponseFormatter
-)
-from tw_stock_mcp.exceptions import (
-    TwStockAgentError,
-    create_error_response
-)
+from tw_stock_mcp.exceptions import TwStockAgentError
 from tw_stock_mcp.services.mcp_resource_service import resource_manager
 
 # Get settings from config
@@ -75,131 +62,80 @@ mcp = FastMCP(
 )
 
 @mcp.tool(name="get_stock_data",
-          description="Get detailed information about a specific stock.",
+          description="取得股票基本資料（公司名稱、產業別、市場等）。",
 )
-async def get_stock_data_tool(stock_code: str) -> StockDataResponse:
-    """Get detailed information about a specific stock."""
+async def get_stock_data_tool(stock_code: str) -> Dict[str, Any]:
     try:
-        raw_data = await get_stock_data(stock_code)
-        # Extract clean data without _metadata for Pydantic model
-        from tw_stock_mcp.utils.mcp_error_handler import MCPResponseFormatter
-        clean_data = MCPResponseFormatter.extract_metadata_for_model(raw_data)
-        return StockDataResponse(**clean_data)
+        return await get_stock_data(stock_code)
     except TwStockAgentError as e:
-        # For MCP tools, we need to return a valid response with error information
-        return StockDataResponse(
-            stock_code=stock_code,
-            updated_at=e.context.timestamp.isoformat(),
-            error=e.message
-        )
+        return {"stock_code": stock_code, "error": e.message}
     except Exception as e:
-        # Handle unexpected errors
-        return StockDataResponse(
-            stock_code=stock_code,
-            updated_at=datetime.now().isoformat(),
-            error=f"Unexpected error: {str(e)}"
-        )
+        return {"stock_code": stock_code, "error": str(e)}
 
 
 @mcp.tool(name="get_price_history",
-          description="Get historical price data for a specific stock.",
+          description="取得股票歷史 K 線資料。",
 )
-async def get_price_history_tool(
-    stock_code: str, period: str = "1mo"
-) -> PriceHistoryResponse:
-    """Get historical price data for a specific stock.""" 
+async def get_price_history_tool(stock_code: str, period: str = "1mo") -> Dict[str, Any]:
     try:
-        raw_data = await get_price_history(stock_code, period)
-        # Extract clean data without _metadata for Pydantic model
-        from tw_stock_mcp.utils.mcp_error_handler import MCPResponseFormatter
-        clean_data = MCPResponseFormatter.extract_metadata_for_model(raw_data)
-        return PriceHistoryResponse(**clean_data)
+        return await get_price_history(stock_code, period)
     except TwStockAgentError as e:
-        # Return error response in proper format
-        return PriceHistoryResponse(
-            stock_code=stock_code,
-            period=period,
-            data=[],
-            error=e.message
-        )
+        return {"stock_code": stock_code, "period": period, "data": [], "error": e.message}
     except Exception as e:
-        return PriceHistoryResponse(
-            stock_code=stock_code,
-            period=period,
-            data=[],
-            error=f"Unexpected error: {str(e)}"
-        )
+        return {"stock_code": stock_code, "period": period, "data": [], "error": str(e)}
+
 
 @mcp.tool(name="get_best_four_points",
-          description="Get Best Four Points analysis for a specific stock.",
+          description="取得四大買賣點技術分析。",
 )
-async def get_best_four_points_tool(stock_code: str) -> BestFourPointsResponse:
-    """Get Best Four Points analysis for a specific stock."""
+async def get_best_four_points_tool(stock_code: str) -> Dict[str, Any]:
     try:
-        raw_data = await get_best_four_points(stock_code)
-        # Extract clean data without _metadata for Pydantic model
-        from tw_stock_mcp.utils.mcp_error_handler import MCPResponseFormatter
-        clean_data = MCPResponseFormatter.extract_metadata_for_model(raw_data)
-        return BestFourPointsResponse(**clean_data)
+        return await get_best_four_points(stock_code)
     except TwStockAgentError as e:
-        return BestFourPointsResponse(
-            stock_code=stock_code,
-            updated_at=e.context.timestamp.isoformat(),
-            error=e.message
-        )
+        return {"stock_code": stock_code, "error": e.message}
     except Exception as e:
-        return BestFourPointsResponse(
-            stock_code=stock_code,
-            updated_at=datetime.now().isoformat(),
-            error=f"Unexpected error: {str(e)}"
-        )
+        return {"stock_code": stock_code, "error": str(e)}
+
 
 @mcp.tool(name="get_realtime_data",
-          description="Get real-time data for a specific stock.",
+          description="取得即時報價。",
 )
-async def get_realtime_data_tool(stock_code: str) -> RealtimeDataResponse:
-    """Get real-time data for a specific stock."""
+async def get_realtime_data_tool(stock_code: str) -> Dict[str, Any]:
     try:
-        raw_data = await get_realtime_data(stock_code)
-        # Extract clean data without _metadata for Pydantic model
-        from tw_stock_mcp.utils.mcp_error_handler import MCPResponseFormatter
-        clean_data = MCPResponseFormatter.extract_metadata_for_model(raw_data)
-        return RealtimeDataResponse(**clean_data)
+        return await get_realtime_data(stock_code)
     except TwStockAgentError as e:
-        return RealtimeDataResponse(
-            stock_code=stock_code,
-            updated_at=e.context.timestamp.isoformat(),
-            error=e.message
-        )
+        return {"stock_code": stock_code, "error": e.message}
     except Exception as e:
-        return RealtimeDataResponse(
-            stock_code=stock_code,
-            updated_at=datetime.now().isoformat(),
-            error=f"Unexpected error: {str(e)}"
-        )
+        return {"stock_code": stock_code, "error": str(e)}
+
 
 @mcp.tool(name="get_market_overview",
-          description="Get market overview information.",
+          description="取得大盤概況（加權指數等）。",
 )
-async def get_market_overview_tool() -> MarketOverviewResponse:
-    """Get market overview information."""
+async def get_market_overview_tool() -> Dict[str, Any]:
     try:
-        raw_data = await get_market_overview()
-        # Extract clean data without _metadata for Pydantic model
-        from tw_stock_mcp.utils.mcp_error_handler import MCPResponseFormatter
-        clean_data = MCPResponseFormatter.extract_metadata_for_model(raw_data)
-        return MarketOverviewResponse(**clean_data)
+        return await get_market_overview()
     except TwStockAgentError as e:
-        return MarketOverviewResponse(
-            date=e.context.timestamp.isoformat(),
-            error=e.message
-        )
+        return {"error": e.message}
     except Exception as e:
-        from datetime import datetime
-        return MarketOverviewResponse(
-            date=datetime.now().isoformat(),
-            error=f"Unexpected error: {str(e)}"
-        )
+        return {"error": str(e)}
+
+
+@mcp.tool(
+    name="get_fundamental_data",
+    description=(
+        "取得個股三年基本面資料：每日本益比（PER）、股價淨值比（PBR）、殖利率，"
+        "以及每季 EPS，並計算每季平均 PER 與近四季累計 EPS（TTM）。"
+        "需要 FINMIND_API_TOKEN 環境變數。"
+    ),
+)
+async def get_fundamental_data_tool(stock_code: str) -> Dict[str, Any]:
+    try:
+        return await get_fundamental_data(stock_code)
+    except TwStockAgentError as e:
+        return {"stock_code": stock_code, "error": e.message}
+    except Exception as e:
+        return {"stock_code": stock_code, "error": str(e)}
 
 
 @mcp.tool(

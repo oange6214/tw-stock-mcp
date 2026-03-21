@@ -251,6 +251,73 @@ async def get_deviation_scan(stock_codes: str = "") -> dict[str, Any]:
     return result
 
 
+@mcp_error_handler("get_fundamental_data")
+async def get_fundamental_data(stock_code: str) -> dict[str, Any]:
+    """
+    取得個股三年基本面資料：每日本益比（PER/PBR/殖利率）與每季 EPS
+
+    Args:
+        stock_code: 股票代號，例如：2330
+
+    Returns:
+        per_history: 近三年每日 PER、PBR、殖利率
+        eps_history: 近三年每季 EPS
+        per_quarterly: 每季平均 PER（以季末日聚合）
+        eps_ttm: 近四季累計 EPS
+
+    Notes:
+        - 資料來源：FinMind TaiwanStockPER 與 TaiwanStockFinancialStatements
+        - 需要 FINMIND_API_TOKEN 環境變數（免費 tier 限 30 req/day）
+    """
+    import os
+    from tw_stock_mcp.providers.finmind_provider import FinMindProvider
+
+    validated_params = validate_stock_request(stock_code=stock_code)
+    code = validated_params["stock_code"]
+
+    token = os.environ.get("FINMIND_API_TOKEN")
+    async with FinMindProvider(api_token=token) as provider:
+        per_rows = await provider.get_per_history(code, years=3)
+        eps_rows = await provider.get_eps_history(code, years=3)
+
+    # Aggregate PER to quarterly averages
+    from collections import defaultdict
+    quarterly_per: dict[str, list[float]] = defaultdict(list)
+    for row in per_rows:
+        date = row.get("date", "")
+        per_val = row.get("PER")
+        if date and per_val is not None:
+            try:
+                q_key = f"{date[:4]}Q{(int(date[5:7]) - 1) // 3 + 1}"
+                quarterly_per[q_key].append(float(per_val))
+            except (ValueError, IndexError):
+                pass
+
+    per_quarterly = {
+        q: round(sum(vals) / len(vals), 2)
+        for q, vals in sorted(quarterly_per.items())
+        if vals
+    }
+
+    # Compute trailing twelve months EPS
+    eps_values = []
+    for row in eps_rows:
+        try:
+            eps_values.append((row.get("date", ""), float(row.get("value", 0))))
+        except (ValueError, TypeError):
+            pass
+    eps_values.sort(key=lambda x: x[0])
+    eps_ttm = round(sum(v for _, v in eps_values[-4:]), 2) if len(eps_values) >= 4 else None
+
+    return {
+        "stock_code": code,
+        "per_history": per_rows,
+        "eps_history": eps_rows,
+        "per_quarterly": per_quarterly,
+        "eps_ttm": eps_ttm,
+    }
+
+
 @mcp_error_handler("get_market_overview")
 async def get_market_overview() -> dict[str, Any]:
     """

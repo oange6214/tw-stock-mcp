@@ -220,17 +220,22 @@ def _last_n_months(n: int) -> list[str]:
 # 核心掃描邏輯
 # ---------------------------------------------------------------------------
 
-async def _fetch_month_closes(
+async def _fetch_month_rows(
     session: aiohttp.ClientSession,
     ssl_ctx: ssl.SSLContext,
     code: str,
     year_month: str,
-) -> list[float]:
-    """取得 *code* 在 *year_month* 的每日收盤價（優先讀快取）。"""
-    # 優先讀快取
-    cached = _load_month_closes_from_cache(code, year_month)
-    if cached is not None:
-        return cached
+) -> list[tuple[str, float]]:
+    """取得 *code* 在 *year_month* 的每日 (date_str, close) 列表（優先讀快取）。
+
+    date_str 格式為 ISO 8601，例如 "2026-03-20"。
+    快取仍以純收盤價陣列儲存（向下相容），date 由 TWSE row[0] 轉換而來。
+    """
+    # 優先讀快取（快取只存 closes，date 另行計算）
+    cached_closes = _load_month_closes_from_cache(code, year_month)
+    if cached_closes is not None:
+        # 快取命中時無法取得精確日期，回傳空 date 字串占位
+        return [("", c) for c in cached_closes]
 
     # 快取未命中，向 TWSE 發請求
     url = f"{TWSE_STOCK_DAY_URL}?response=json&date={year_month}&stockNo={code}"
@@ -246,18 +251,41 @@ async def _fetch_month_closes(
             data = _json.loads(body.decode("utf-8"))
             if data.get("stat") != "OK" or "data" not in data:
                 return []
-            closes: list[float] = []
+            rows: list[tuple[str, float]] = []
             for row in data["data"]:
                 try:
-                    closes.append(float(row[6].replace(",", "")))
+                    # row[0]: 民國日期 "115/03/20" → ISO "2026-03-20"
+                    date_str = _roc_to_iso(row[0])
+                    close = float(row[6].replace(",", ""))
+                    rows.append((date_str, close))
                 except Exception:
                     pass
-            # 寫入快取
-            _save_month_closes_to_cache(code, year_month, closes)
-            return closes
+            _save_month_closes_to_cache(code, year_month, [r[1] for r in rows])
+            return rows
     except Exception as exc:
         logger.debug("抓取失敗 %s %s：%s", code, year_month, exc)
         return []
+
+
+def _roc_to_iso(roc_date: str) -> str:
+    """將民國日期 '115/03/20' 轉為 ISO '2026-03-20'。"""
+    try:
+        parts = roc_date.strip().split("/")
+        year = int(parts[0]) + 1911
+        return f"{year}-{parts[1]}-{parts[2]}"
+    except Exception:
+        return ""
+
+
+async def _fetch_month_closes(
+    session: aiohttp.ClientSession,
+    ssl_ctx: ssl.SSLContext,
+    code: str,
+    year_month: str,
+) -> list[float]:
+    """向下相容的純收盤價版本，供外部呼叫者使用。"""
+    rows = await _fetch_month_rows(session, ssl_ctx, code, year_month)
+    return [r[1] for r in rows]
 
 
 async def _scan_single(
@@ -271,10 +299,13 @@ async def _scan_single(
 ) -> dict[str, Any]:
     """評估單一股票是否符合雙重乖離條件。"""
     async with semaphore:
-        closes: list[float] = []
+        rows: list[tuple[str, float]] = []
         for month in months:
-            month_closes = await _fetch_month_closes(session, ssl_ctx, code, month)
-            closes.extend(month_closes)
+            month_rows = await _fetch_month_rows(session, ssl_ctx, code, month)
+            rows.extend(month_rows)
+        closes = [r[1] for r in rows]
+        # 取最後一個有非空日期的交易日
+        last_date = next((r[0] for r in reversed(rows) if r[0]), "")
 
         # 更新進度
         progress["done"] += 1
@@ -303,6 +334,7 @@ async def _scan_single(
                 "close": today_close,
                 "ma60": round(ma60, 2),
                 "today_deviation": round(today_dev, 2),
+                "last_date": last_date,
                 "matched": False,
             }
 
@@ -330,6 +362,7 @@ async def _scan_single(
             "today_deviation": round(today_dev, 2),
             "negative_days_30": neg_days,
             "negative_ratio_30": round(neg_ratio, 1),
+            "last_date": last_date,
             "matched": matched,
         }
 
@@ -370,7 +403,13 @@ async def run_deviation_scan(
     matched = [r for r in results if r.get("matched")]
     scanned = [r for r in results if not r.get("skipped")]
 
-    print(f"掃描完成：共 {total} 支，有效 {len(scanned)} 支，命中 {len(matched)} 支", flush=True)
+    # 從所有結果中取最新的 last_date（即最後交易日）
+    last_trading_date = max(
+        (r.get("last_date", "") for r in results if r.get("last_date")),
+        default="",
+    )
+
+    print(f"掃描完成：共 {total} 支，有效 {len(scanned)} 支，命中 {len(matched)} 支，最後交易日 {last_trading_date}", flush=True)
 
     return {
         "total_stocks": total,
@@ -378,6 +417,7 @@ async def run_deviation_scan(
         "matched_count": len(matched),
         "matched": matched,
         "months": months,
+        "last_trading_date": last_trading_date,
     }
 
 

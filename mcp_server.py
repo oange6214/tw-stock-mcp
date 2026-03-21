@@ -17,6 +17,7 @@ from tw_stock_mcp.models import (
 from tw_stock_mcp.tools.stock_tools import (
     get_best_four_points,
     get_deviation_scan,
+    get_fundamental_data,
     get_market_overview,
     get_price_history,
     get_realtime_data,
@@ -200,6 +201,24 @@ async def get_market_overview_tool() -> MarketOverviewResponse:
             date=datetime.now().isoformat(),
             error=f"Unexpected error: {str(e)}"
         )
+
+
+@mcp.tool(
+    name="get_fundamental_data",
+    description=(
+        "取得個股三年基本面資料：每日本益比（PER）、股價淨值比（PBR）、殖利率，"
+        "以及每季 EPS，並計算每季平均 PER 與近四季累計 EPS（TTM）。"
+        "需要 FINMIND_API_TOKEN 環境變數。"
+    ),
+)
+async def get_fundamental_data_tool(stock_code: str) -> Dict[str, Any]:
+    """Get 3-year fundamental data: PE ratio history and quarterly EPS."""
+    try:
+        return await get_fundamental_data(stock_code)
+    except TwStockAgentError as e:
+        return {"stock_code": stock_code, "error": e.message}
+    except Exception as e:
+        return {"stock_code": stock_code, "error": f"Unexpected error: {str(e)}"}
 
 
 @mcp.tool(

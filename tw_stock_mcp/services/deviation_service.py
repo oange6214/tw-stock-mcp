@@ -1,4 +1,4 @@
-"""Bulk deviation scan service — fetches TWSE STOCK_DAY data and calculates 60MA deviation."""
+"""Bulk deviation scan service — fetches TWSE/TPEX STOCK_DAY data and calculates 60MA deviation."""
 
 import asyncio
 import json
@@ -16,6 +16,8 @@ logger = logging.getLogger("tw-stock-agent.deviation_service")
 
 TWSE_STOCK_DAY_URL = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
 TWSE_STOCK_DAY_ALL_URL = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
+TPEX_STOCK_DAY_ALL_URL = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
+FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -24,6 +26,7 @@ HEADERS = {
 
 # --- Cache constants ---
 _STOCK_LIST_CACHE_KEY = "twse:stock_list"
+_TPEX_STOCK_LIST_CACHE_KEY = "tpex:stock_list"
 _STOCK_LIST_CACHE_MAX_AGE = 7 * 24 * 3600       # 7 days
 _MONTH_CACHE_TTL_PAST = 7 * 24 * 3600            # 過去月份：7天（資料不會再變）
 _MONTH_CACHE_TTL_CURRENT = 1 * 3600              # 當月：1小時（當天可能更新）
@@ -66,8 +69,8 @@ _ensure_cache_table()
 # 月份收盤資料快取
 # ---------------------------------------------------------------------------
 
-def _month_cache_key(code: str, year_month: str) -> str:
-    return f"twse:month:{code}:{year_month}"
+def _month_cache_key(code: str, year_month: str, market: str = "twse") -> str:
+    return f"{market}:month:{code}:{year_month}"
 
 
 def _is_current_month(year_month: str) -> bool:
@@ -75,11 +78,11 @@ def _is_current_month(year_month: str) -> bool:
     return year_month == f"{today.year}{today.month:02d}01"
 
 
-def _load_month_closes_from_cache(code: str, year_month: str) -> list[float] | None:
+def _load_month_closes_from_cache(code: str, year_month: str, market: str = "twse") -> list[float] | None:
     """從快取讀取月份收盤資料，若已過期則回傳 None。"""
     try:
         db_path = _cache_db_path()
-        key = _month_cache_key(code, year_month)
+        key = _month_cache_key(code, year_month, market)
         ttl = _MONTH_CACHE_TTL_CURRENT if _is_current_month(year_month) else _MONTH_CACHE_TTL_PAST
         cutoff = int(time.time()) - ttl
         with sqlite3.connect(db_path, timeout=10) as conn:
@@ -94,13 +97,13 @@ def _load_month_closes_from_cache(code: str, year_month: str) -> list[float] | N
     return None
 
 
-def _save_month_closes_to_cache(code: str, year_month: str, closes: list[float]) -> None:
+def _save_month_closes_to_cache(code: str, year_month: str, closes: list[float], market: str = "twse") -> None:
     """將月份收盤資料寫入快取。"""
     if not closes:
         return
     try:
         db_path = _cache_db_path()
-        key = _month_cache_key(code, year_month)
+        key = _month_cache_key(code, year_month, market)
         ttl = _MONTH_CACHE_TTL_CURRENT if _is_current_month(year_month) else _MONTH_CACHE_TTL_PAST
         now = int(time.time())
         value = json.dumps(closes)
@@ -288,6 +291,62 @@ async def _fetch_month_closes(
     return [r[1] for r in rows]
 
 
+async def _fetch_tpex_month_rows(
+    session: aiohttp.ClientSession,
+    ssl_ctx: ssl.SSLContext,
+    code: str,
+    year_month: str,
+) -> list[tuple[str, float]]:
+    """使用 FinMind API 取得 TPEX *code* 在 *year_month* 的每日 (date_str, close) 列表。
+
+    FinMind 同時涵蓋上市/上櫃股票，不受 TPEX 官方 API 格式限制。
+    設定環境變數 FINMIND_API_TOKEN 可提升速率上限（free tier: 30 req/day）。
+    """
+    cached_closes = _load_month_closes_from_cache(code, year_month, market="tpex")
+    if cached_closes is not None:
+        return [("", c) for c in cached_closes]
+
+    year = int(year_month[:4])
+    month = int(year_month[4:6])
+    start_date = f"{year}-{month:02d}-01"
+    if month == 12:
+        next_year, next_month = year + 1, 1
+    else:
+        next_year, next_month = year, month + 1
+    end_date = min(f"{next_year}-{next_month:02d}-01", date.today().isoformat())
+
+    params: dict[str, str] = {
+        "dataset": "TaiwanStockPrice",
+        "data_id": code,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+    token = os.environ.get("FINMIND_API_TOKEN", "")
+    if token:
+        params["token"] = token
+
+    await _rate_limited_sleep()
+    try:
+        async with session.get(
+            FINMIND_URL, params=params, timeout=aiohttp.ClientTimeout(total=20)
+        ) as resp:
+            if resp.status != 200:
+                return []
+            data = await resp.json(content_type=None)
+            raw_rows = data.get("data", [])
+            rows: list[tuple[str, float]] = []
+            for row in raw_rows:
+                try:
+                    rows.append((str(row["date"]), float(row["close"])))
+                except Exception:
+                    pass
+            _save_month_closes_to_cache(code, year_month, [r[1] for r in rows], market="tpex")
+            return rows
+    except Exception as exc:
+        logger.debug("FinMind TPEX 抓取失敗 %s %s：%s", code, year_month, exc)
+        return []
+
+
 async def _scan_single(
     session: aiohttp.ClientSession,
     ssl_ctx: ssl.SSLContext,
@@ -296,12 +355,14 @@ async def _scan_single(
     name: str,
     months: list[str],
     progress: dict[str, Any],
+    market: str = "twse",
 ) -> dict[str, Any]:
     """評估單一股票是否符合雙重乖離條件。"""
+    fetch_rows = _fetch_tpex_month_rows if market == "tpex" else _fetch_month_rows
     async with semaphore:
         rows: list[tuple[str, float]] = []
         for month in months:
-            month_rows = await _fetch_month_rows(session, ssl_ctx, code, month)
+            month_rows = await fetch_rows(session, ssl_ctx, code, month)
             rows.extend(month_rows)
         closes = [r[1] for r in rows]
         # 取最後一個有非空日期的交易日
@@ -322,12 +383,12 @@ async def _scan_single(
         if len(closes) < _MIN_CLOSES:
             return {"code": code, "name": name, "matched": False, "skipped": True}
 
-        # 條件一：今日乖離率 0–5%（剛站上 60MA）
+        # 條件一：今日乖離率 0–10%（剛站上 60MA）
         today_close = closes[-1]
         ma60 = sum(closes[-60:]) / 60
         today_dev = (today_close - ma60) / ma60 * 100
 
-        if not (0 < today_dev <= 5):
+        if not (0 < today_dev <= 10):
             return {
                 "code": code,
                 "name": name,
@@ -371,13 +432,17 @@ async def run_deviation_scan(
     stocks: list[tuple[str, str]],
     months: list[str] | None = None,
     concurrency: int = 3,
+    market: str = "twse",
+    stock_markets: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """掃描所有 *stocks* 的 60MA 乖離條件。
 
     Args:
         stocks: (code, name) 的清單。
         months: 要抓取的月份（格式 YYYYMMDD），預設最近 6 個月。
-        concurrency: 最大並發 TWSE 請求數。
+        concurrency: 最大並發請求數。
+        market: "twse"（預設）、"tpex"、或 "all"。
+        stock_markets: 當 market="all" 時，{code: "twse"|"tpex"} 的對應表。
 
     Returns:
         含 ``matched`` 清單、``total_scanned``、``total_stocks``、``months`` 的字典。
@@ -387,7 +452,7 @@ async def run_deviation_scan(
 
     total = len(stocks)
     progress: dict[str, Any] = {"done": 0, "total": total, "matched": 0}
-    print(f"開始掃描 {total} 支股票，月份範圍：{months[0]} ~ {months[-1]}", flush=True)
+    print(f"開始掃描 {total} 支股票（{market}），月份範圍：{months[0]} ~ {months[-1]}", flush=True)
 
     ssl_ctx = _build_ssl_context()
     semaphore = asyncio.Semaphore(concurrency)
@@ -395,7 +460,10 @@ async def run_deviation_scan(
 
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = [
-            _scan_single(session, ssl_ctx, semaphore, code, name, months, progress)
+            _scan_single(
+                session, ssl_ctx, semaphore, code, name, months, progress,
+                market=(stock_markets.get(code, "twse") if stock_markets else market),
+            )
             for code, name in stocks
         ]
         results: list[dict[str, Any]] = await asyncio.gather(*tasks)
@@ -482,3 +550,106 @@ async def fetch_twse_stock_list(min_trade_value: int = 100_000_000) -> list[tupl
     raise RuntimeError(
         f"無法取得 TWSE 股票清單，且無可用快取。原因：{reason}"
     )
+
+
+async def fetch_tpex_stock_list(min_trade_value: int = 30_000_000) -> list[tuple[str, str]]:
+    """從 TPEX 取得當日上櫃股票清單，回傳 (code, name) 對。
+
+    篩選條件：
+    - 4位純數字代號（排除 ETF、DR、權證）
+    - TradeValue（成交金額）> min_trade_value（預設 3 千萬）
+
+    容錯機制：
+    - 成功時：將結果存入 SQLite 快取（TTL 7天）。
+    - 失敗或空回應（非交易日）：先嘗試快取回退再拋出例外。
+    """
+    ssl_ctx = _build_ssl_context()
+    connector = aiohttp.TCPConnector()
+    fetch_error: Exception | None = None
+    rows: list = []
+
+    async with aiohttp.ClientSession(connector=connector) as session:
+        try:
+            async with session.get(
+                TPEX_STOCK_DAY_ALL_URL,
+                headers=HEADERS,
+                timeout=aiohttp.ClientTimeout(total=30),
+                ssl=ssl_ctx,
+            ) as resp:
+                if resp.status != 200:
+                    fetch_error = RuntimeError(f"TPEX STOCK_DAY_ALL 回傳 HTTP {resp.status}")
+                else:
+                    rows = await resp.json(content_type=None)
+        except Exception as exc:
+            fetch_error = exc
+
+    stocks: list[tuple[str, str]] = []
+    for row in rows:
+        code = str(row.get("SecuritiesCompanyCode", "") or row.get("Code", "")).strip()
+        name = str(row.get("CompanyName", "") or row.get("Name", "")).strip()
+        if not (len(code) == 4 and code.isdigit() and not code.startswith("00")):
+            continue
+        # TPEX openapi uses "TransactionAmount" for 成交金額
+        raw_value = row.get("TransactionAmount") or row.get("TradeValue", "0")
+        try:
+            trade_value = int(str(raw_value).replace(",", "").replace(".0", "").split(".")[0])
+        except ValueError:
+            trade_value = 0
+        if trade_value > min_trade_value:
+            stocks.append((code, name))
+
+    if stocks:
+        logger.info("從 TPEX 取得股票清單：篩選後 %d 支", len(stocks))
+        _save_tpex_stock_list_to_cache(stocks)
+        return stocks
+
+    reason = str(fetch_error) if fetch_error else "TPEX 回傳空清單（非交易日？）"
+    logger.warning("無法取得即時 TPEX 股票清單（%s），嘗試快取回退", reason)
+
+    cached = _load_tpex_stock_list_from_cache()
+    if cached:
+        logger.info("使用快取 TPEX 股票清單：%d 支", len(cached))
+        return cached
+
+    raise RuntimeError(
+        f"無法取得 TPEX 股票清單，且無可用快取。原因：{reason}"
+    )
+
+
+def _load_tpex_stock_list_from_cache() -> list[tuple[str, str]] | None:
+    try:
+        db_path = _cache_db_path()
+        if not os.path.exists(db_path):
+            return None
+        cutoff = int(time.time()) - _STOCK_LIST_CACHE_MAX_AGE
+        with sqlite3.connect(db_path, timeout=10) as conn:
+            row = conn.execute(
+                "SELECT value FROM cache WHERE key = ? AND created_at >= ?",
+                (_TPEX_STOCK_LIST_CACHE_KEY, cutoff),
+            ).fetchone()
+        if row:
+            return [(item["code"], item["name"]) for item in json.loads(row[0])]
+    except Exception as exc:
+        logger.warning("讀取 TPEX 股票清單快取失敗：%s", exc)
+    return None
+
+
+def _save_tpex_stock_list_to_cache(stocks: list[tuple[str, str]]) -> None:
+    try:
+        db_path = _cache_db_path()
+        now = int(time.time())
+        value = json.dumps([{"code": c, "name": n} for c, n in stocks], ensure_ascii=False)
+        expire_at = now + _STOCK_LIST_CACHE_MAX_AGE
+        with sqlite3.connect(db_path, timeout=10) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO cache
+                    (key, value, expire_at, created_at, last_accessed, data_type, size_bytes)
+                VALUES (?, ?, ?, ?, ?, 'json', ?)
+                """,
+                (_TPEX_STOCK_LIST_CACHE_KEY, value, expire_at, now, now, len(value.encode())),
+            )
+            conn.commit()
+        logger.info("TPEX 股票清單已快取：%d 支", len(stocks))
+    except Exception as exc:
+        logger.warning("寫入 TPEX 股票清單快取失敗：%s", exc)

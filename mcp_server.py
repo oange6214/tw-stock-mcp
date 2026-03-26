@@ -224,16 +224,16 @@ async def get_fundamental_data_tool(stock_code: str) -> Dict[str, Any]:
 @mcp.tool(
     name="get_deviation_scan",
     description=(
-        "批量掃描所有台股的 60MA 負乖離翻正標的。"
-        "篩選條件：今日乖離率 0~5%（剛站上 MA60），且近 30 日有 ≥24 天為負乖離。"
-        "傳入逗號分隔的 stock_codes 可只掃描指定股票；留空則自動從 TWSE 抓取當日清單。"
+        "批量掃描所有台股的 60MA 負乖離翻正標的。篩選條件:今日乖離率 0~10%(剛站上 MA60),且近 30 日有 ≥24 天為負乖離。"
+        "傳入逗號分隔的 stock_codes 可只掃描指定股票;留空則自動從交易所抓取當日清單。"
+        "market 參數: 'twse'（上市，預設）、'tpex'（上櫃）、'all'（全市場）。"
         "注意：全市場掃描約需 10–20 分鐘，建議盤後執行。"
     ),
 )
-async def get_deviation_scan_tool(stock_codes: str = "") -> Dict[str, Any]:
-    """Bulk TWSE deviation scan — returns matched stocks with 60MA deviation criteria."""
+async def get_deviation_scan_tool(stock_codes: str = "", market: str = "twse") -> Dict[str, Any]:
+    """Bulk deviation scan (TWSE/TPEX) — returns matched stocks with 60MA deviation criteria."""
     try:
-        return await get_deviation_scan(stock_codes)
+        return await get_deviation_scan(stock_codes, market=market)
     except TwStockAgentError as e:
         return {"error": e.message, "matched": [], "matched_count": 0}
     except Exception as e:

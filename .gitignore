@@ -40,6 +40,7 @@ ENV/
 *.db
 cache/
 data/
+.cache/
 
 # OS
 .DS_Store
@@ -48,4 +49,10 @@ Thumbs.db
 # Added by Gemini
 .claude/
 .coverage
+.coverage.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.python-version
 log/

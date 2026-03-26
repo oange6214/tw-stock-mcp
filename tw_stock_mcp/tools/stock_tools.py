@@ -217,37 +217,64 @@ async def get_realtime_data(stock_code: str) -> dict[str, Any]:
     return MCPResponseFormatter.format_realtime_data_response(result)
 
 @mcp_error_handler("get_deviation_scan")
-async def get_deviation_scan(stock_codes: str = "") -> dict[str, Any]:
+async def get_deviation_scan(stock_codes: str = "", market: str = "all") -> dict[str, Any]:
     """
     批量掃描台股負乖離翻正標的（60MA 基準）
 
     Args:
         stock_codes: 逗號分隔的股票代號，例如 "2330,2454,2382"。
-                     留空則自動從 TWSE STOCK_DAY_ALL 抓取當日清單（TradeValue > 1億）。
+                     留空則依 market 參數自動抓取當日清單。
+        market: 掃描市場，"all"（全市場，預設）、"twse"（上市）、"tpex"（上櫃）。
+                手動指定 stock_codes 時此參數決定使用哪個資料來源；
+                "all" 時會自動對照上市/上櫃清單決定每支股票的來源。
 
     Returns:
-        篩選結果，包含 matched 清單（今日乖離 0~5%，近30日負乖離 ≥24天）。
-        每支股票回傳: code, name, close, ma20, today_deviation,
+        篩選結果，包含 matched 清單（今日乖離 0~10%，近30日負乖離 ≥24天）。
+        每支股票回傳: code, name, close, ma60, today_deviation,
                       negative_days_30, negative_ratio_30, matched
 
     Notes:
-        - 自動抓取近 4 個月 TWSE STOCK_DAY 資料（繞過 SSL 憑證問題）
-        - 需要至少 51 筆收盤價（20 MA + 30 評估日 + 1 今日）
-        - 並發上限 3，每股間隔 0.35s，符合 TWSE 速率限制
+        - 抓取近 6 個月收盤資料，計算 60MA
+        - TWSE 繞過 SSL 憑證問題；TPEX 透過 FinMind API 取得
+        - 並發上限 3，符合各交易所速率限制
     """
     from tw_stock_mcp.services.deviation_service import (
         run_deviation_scan,
         fetch_twse_stock_list,
+        fetch_tpex_stock_list,
+        _last_n_months,
     )
 
     if stock_codes.strip():
         codes = [c.strip() for c in stock_codes.split(",") if c.strip()]
-        stocks = [(c, c) for c in codes]  # name unknown when user provides codes
-    else:
+        stocks = [(c, c) for c in codes]
+        if market in ("all", "twse"):
+            # 取得上市/上櫃清單以判斷各代號來源；找不到的預設 twse
+            twse_stocks = await fetch_twse_stock_list()
+            tpex_stocks = await fetch_tpex_stock_list()
+            stock_markets = {code: "twse" for code, _ in twse_stocks}
+            stock_markets.update({code: "tpex" for code, _ in tpex_stocks})
+            result = await run_deviation_scan(
+                stocks, months=_last_n_months(6), market="all", stock_markets=stock_markets
+            )
+        else:  # market == "tpex"
+            result = await run_deviation_scan(stocks, months=_last_n_months(6), market="tpex")
+    elif market == "tpex":
+        stocks = await fetch_tpex_stock_list()
+        result = await run_deviation_scan(stocks, months=_last_n_months(6), market="tpex")
+    elif market == "twse":
         stocks = await fetch_twse_stock_list()
+        result = await run_deviation_scan(stocks, months=_last_n_months(6), market="twse")
+    else:  # all (default)
+        twse_stocks = await fetch_twse_stock_list()
+        tpex_stocks = await fetch_tpex_stock_list()
+        all_stocks = twse_stocks + tpex_stocks
+        stock_markets = {code: "twse" for code, _ in twse_stocks}
+        stock_markets.update({code: "tpex" for code, _ in tpex_stocks})
+        result = await run_deviation_scan(
+            all_stocks, months=_last_n_months(6), market="all", stock_markets=stock_markets
+        )
 
-    from tw_stock_mcp.services.deviation_service import _last_n_months
-    result = await run_deviation_scan(stocks, months=_last_n_months(6))
     return result
 
 
@@ -269,15 +296,19 @@ async def get_fundamental_data(stock_code: str) -> dict[str, Any]:
         - 資料來源：FinMind TaiwanStockPER 與 TaiwanStockFinancialStatements
         - 需要 FINMIND_API_TOKEN 環境變數（免費 tier 限 30 req/day）
     """
-    import os
     from tw_stock_mcp.providers.finmind_provider import FinMindProvider
+    from tw_stock_mcp.utils.config import get_settings
 
     validated_params = validate_stock_request(stock_code=stock_code)
     code = validated_params["stock_code"]
 
-    token = os.environ.get("FINMIND_API_TOKEN")
+    token = get_settings().FINMIND_API_TOKEN
     async with FinMindProvider(api_token=token) as provider:
-        per_rows = await provider.get_per_history(code, years=3)
+        # TaiwanStockPER requires a paid FinMind tier; degrade gracefully if unavailable
+        try:
+            per_rows = await provider.get_per_history(code, years=3)
+        except Exception:
+            per_rows = []
         eps_rows = await provider.get_eps_history(code, years=3)
 
     # Aggregate PER to quarterly averages
@@ -311,9 +342,9 @@ async def get_fundamental_data(stock_code: str) -> dict[str, Any]:
 
     return {
         "stock_code": code,
-        "per_history": per_rows,
+        "per_history": per_rows,           # empty list if TaiwanStockPER unavailable (paid tier)
         "eps_history": eps_rows,
-        "per_quarterly": per_quarterly,
+        "per_quarterly": per_quarterly,    # empty dict if per_history unavailable
         "eps_ttm": eps_ttm,
     }
 
